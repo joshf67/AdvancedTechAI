@@ -1,0 +1,2 @@
+This week i have made simple AI navigation using unity's NavMesh features, this involves an AI capable of climbing up and over walls. This also includes a simple find nearest cover function which moves the AI to the nearest cover NavMesh area.
+next time i will be adding in a waypoint mechanic so the user can tell the ai to follow path, i may also be going back to unity's built in NavMesh as the 5.6.3 NavMesh seems to have issues and provides little benefit.
