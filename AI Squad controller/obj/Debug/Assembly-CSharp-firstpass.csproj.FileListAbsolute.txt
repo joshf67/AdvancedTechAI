@@ -26,6 +26,6 @@ D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\nunit.framework
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.Analytics.xml
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.HoloLens.xml
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.VR.xml
+D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp-firstpass.csprojResolveAssemblyReference.cache
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp-firstpass.dll
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp-firstpass.pdb
-D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp-firstpass.csprojResolveAssemblyReference.cache
