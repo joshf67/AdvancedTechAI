@@ -62,6 +62,7 @@ public class unitWaypoint : MonoBehaviour {
 				if (path.Count != 0) {
 					GameObject[] objects = GameObject.FindGameObjectsWithTag ("Unit");
 					bool hasUnit = false;
+					delay = GameObject.FindObjectOfType<UIinputs> ().time;
 					for (int a = 0; a < objects.Length; a++) {
 						if (objects [a].GetComponent<unitWay> ().selected) {
 							if (objects [a].GetComponent<unitWay> ().follow) {
@@ -90,27 +91,23 @@ public class unitWaypoint : MonoBehaviour {
 		if (Input.GetMouseButtonDown (0)) {
 			if (main.waypoint) {
 				RaycastHit hit;
-				Camera[] cam = Camera.allCameras;
-				Ray mousePoint = cam [0].ScreenPointToRay (Input.mousePosition);
-				if (main.waypoint) {
-					if (Physics.Raycast (mousePoint, out hit)) {
-						path.Add (hit.point);
-						GameObject temp = GameObject.CreatePrimitive (PrimitiveType.Cube);
-						temp.transform.position = hit.point + new Vector3 (0, temp.transform.localScale.y, 0);
-						temp.transform.localScale /= 4;
-						temp.GetComponent<Renderer> ().material.color = new Color ((pathCount + 1) / 10, 10 / (pathCount + 1), 0);
-						temp.GetComponent<Collider> ().enabled = false;
-						temp.AddComponent <LineRenderer> ();
-						temp.GetComponent<LineRenderer> ().startWidth = 0.1f;
-						temp.GetComponent<LineRenderer> ().endWidth = 0.1f;
-						temp.GetComponent<LineRenderer> ().startColor = Color.green;
-						temp.GetComponent<LineRenderer> ().endColor = Color.red;
-						temp.GetComponent<LineRenderer> ().material = line;
-						pathObj.Add (temp);
-						pathCount = path.Count;
-						if (pathCount != 1) {
-							setupPath ();
-						}
+				if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
+					path.Add (hit.point);
+					GameObject temp = GameObject.CreatePrimitive (PrimitiveType.Cube);
+					temp.transform.position = hit.point + new Vector3 (0, temp.transform.localScale.y, 0);
+					temp.transform.localScale /= 4;
+					temp.GetComponent<Renderer> ().material.color = new Color ((pathCount + 1) / 10, 10 / (pathCount + 1), 0);
+					temp.GetComponent<Collider> ().enabled = false;
+					temp.AddComponent <LineRenderer> ();
+					temp.GetComponent<LineRenderer> ().startWidth = 0.1f;
+					temp.GetComponent<LineRenderer> ().endWidth = 0.1f;
+					temp.GetComponent<LineRenderer> ().startColor = Color.green;
+					temp.GetComponent<LineRenderer> ().endColor = Color.red;
+					temp.GetComponent<LineRenderer> ().material = line;
+					pathObj.Add (temp);
+					pathCount = path.Count;
+					if (pathCount != 1) {
+						setupPath ();
 					}
 				}
 			} else if (main.move) {
@@ -124,14 +121,42 @@ public class unitWaypoint : MonoBehaviour {
 								selected [a].GetComponent<NavMeshAgent> ().SetDestination (closest);
 								selected [a].GetComponent<unitWay> ().pos = closest;
 								selected [a].GetComponent<unitWay> ().index = index;
+								if (selected [a].GetComponent<unitWay> ().follow) {
+									selected [a].GetComponent<unitWay> ().resetFollow ();
+								}
+								foreach (GameObject obj in selected [a].GetComponent<unitWay>().returnAllFollowers()) {
+									if (!selected.Contains (obj) && obj.GetComponent<unitWay>().pos == Vector3.zero) {
+										Vector3 closest2 = findClosest (hit.point, obj.transform.position, out index);
+										obj.GetComponent<NavMeshAgent> ().SetDestination (closest2);
+										obj.GetComponent<unitWay> ().pos = closest2;
+										obj.GetComponent<unitWay> ().index = index;
+									}
+								}
 							}
 						}
 					} else {
 						for (int a = 0; a < selected.Count; a++) {
 							selected [a].GetComponent<unitWay> ().crouch = false;
+							if (selected [a].GetComponent<unitWay> ().follow) {
+								selected [a].GetComponent<unitWay> ().resetFollow ();
+							}
 							cover [selected [a].GetComponent<unitWay> ().index].free = true;
 							selected [a].GetComponent<unitWay> ().pos = Vector3.zero;
 							selected [a].GetComponent<NavMeshAgent> ().SetDestination (hit.point);
+
+							foreach (GameObject obj in selected [a].GetComponent<unitWay>().returnAllFollowers()) {
+								obj.GetComponent<unitWay> ().pos = Vector3.zero;
+								cover [obj.GetComponent<unitWay> ().index].free = true;
+							}
+						}
+					}
+				}
+			} else if (main.follow) {
+				RaycastHit hit;
+				if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
+					if (hit.collider.tag == "Unit") {
+						foreach (GameObject obj in selected) {
+							obj.GetComponent<unitWay> ().setupFollower(hit.collider.gameObject);
 						}
 					}
 				}
@@ -142,15 +167,23 @@ public class unitWaypoint : MonoBehaviour {
 	Vector3 findClosest (Vector3 temp, Vector3 pos, out int _index) {
 		Vector3 ret = Vector3.zero;
 		float curDist = float.PositiveInfinity;
+		float navDist = 0;
 		int index = 0;
 		float danger = 1;
 		for (int a = 0; a < cover.Length; a++) {
-			if (cover [a].free == false) {
+			if (cover [a].free == true) {
 				danger = pollDanger (cover [a]);
-				if (Vector3.Distance (cover [a].transform.position, temp) + danger < curDist) {
-					ret = cover [a].transform.position;
-					curDist = Vector3.Distance (cover [a].transform.position, temp) + danger;
-					index = a;
+				NavMeshPath path = new NavMeshPath();
+				if (NavMesh.CalculatePath(pos, cover [a].pos, NavMesh.AllAreas, path)) {
+					navDist = 0;
+					for (int b = 0; b < path.corners.Length - 1; b++) {
+						navDist += Vector3.Distance (path.corners [b], path.corners [b + 1]);
+					}
+					if (Vector3.Distance (cover [a].transform.position, temp) /*+ navDist*/ + danger < curDist) {
+						ret = cover [a].transform.position;
+						curDist = Vector3.Distance (cover [a].transform.position, temp) + danger;
+						index = a;
+					}
 				}
 			}
 		}

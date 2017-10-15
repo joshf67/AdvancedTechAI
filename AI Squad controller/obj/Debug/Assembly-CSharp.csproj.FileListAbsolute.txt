@@ -59,7 +59,6 @@ H:\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.VR.xml
 H:\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.csprojResolveAssemblyReference.cache
 H:\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.dll
 H:\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.pdb
-D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.csprojResolveAssemblyReference.cache
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\Assembly-CSharp.dll
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\Assembly-CSharp.pdb
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\nunit.framework.dll
@@ -89,5 +88,6 @@ D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\nunit.framework
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.Analytics.xml
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.HoloLens.xml
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\Temp\bin\Debug\UnityEngine.VR.xml
+D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.csprojResolveAssemblyReference.cache
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.dll
 D:\Desktop\Git\AdvancedTechAI\AI Squad controller\obj\Debug\Assembly-CSharp.pdb

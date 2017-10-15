@@ -8,7 +8,7 @@ public class unitWay : MonoBehaviour {
 	public bool follow = false;
 	public GameObject enemyTarget = null;
 	public GameObject target = null;
-	public GameObject follower = null;
+	public List<GameObject> follower = null;
 	public List<Vector3> path = new List<Vector3>();
 	public float minDist = 0;
 	public float totalDelay = 0;
@@ -22,10 +22,13 @@ public class unitWay : MonoBehaviour {
 	public Vector3 pos = Vector3.zero;
 	public int index = 0;
 	public float fire = 0;
+	public float startSpeed = 0;
+	public float crouchCoolDown = 0;
 
 	// Use this for initialization
 	void Start () {
 		GetComponent<NavMeshAgent> ().stoppingDistance = minDist;
+		startSpeed = GetComponent<NavMeshAgent> ().speed;
 		//deal with setting up following count for distance checks
 		if (target != null) {
 			follow = true;
@@ -40,7 +43,7 @@ public class unitWay : MonoBehaviour {
 				}
 			}
 			main = false;
-			target.GetComponent<unitWay> ().follower = gameObject;
+			target.GetComponent<unitWay> ().follower.Add(gameObject);
 		} else {
 			follow = false;
 		}
@@ -64,53 +67,72 @@ public class unitWay : MonoBehaviour {
 		} else {
 			if (fire <= 0) {
 				RaycastHit hit;
-				Debug.DrawRay (transform.position, enemyTarget.transform.position - transform.position);
-				if (Physics.Raycast (transform.position, enemyTarget.transform.position - transform.position, out hit)) {
-					if (hit.collider.gameObject == enemyTarget) {
-						enemyTarget.GetComponent<Health> ().hp -= 1;
+				if (transform.localScale == new Vector3 (0.5f, 0.8f, 0.5f)) {
+					if (Physics.Raycast (transform.position + new Vector3 (0, transform.localScale.y / 2, 0), enemyTarget.transform.position - transform.position, out hit)) {
+						if (hit.collider.gameObject == enemyTarget) {
+							Debug.DrawRay (transform.position + new Vector3 (0, transform.localScale.y / 2, 0), enemyTarget.transform.position - transform.position, Color.yellow);
+							enemyTarget.GetComponent<Health> ().hp -= 1;
+						}
 					}
+					fire = 0.2f;
 				}
-				fire = 1;
 			} else {
 				fire -= Time.deltaTime;
 			}
-		}
-		if (pos != Vector3.zero) {
-			if (GetComponent<NavMeshAgent> ().remainingDistance < minDist && crouch == false) {
-				transform.localScale = new Vector3 (0.5f, 0.4f, 0.5f);
-				crouch = true;
-			}
-		} else {
-			transform.localScale = new Vector3 (0.5f, 0.8f, 0.5f);
-			crouch = false;
 		}
 		if (selected) {
 			GetComponent<LineRenderer> ().enabled = true;
 		} else {
 			GetComponent<LineRenderer> ().enabled = false;
 		}
-		if (follow) {
-			delay -= Time.deltaTime;
-			if (delay <= 0) {
-				if (followingPath) {
-					//deal with following path
-					checkPath ();
-				} else if (target != null) {
-					//deal with following player
-					if (Vector3.Distance (transform.position, target.transform.position) > minDist * 2) {
-						GetComponent<NavMeshAgent> ().SetDestination (target.transform.position);
-						prevDest = target.transform.position;
+		if (pos != Vector3.zero) {
+			if (GetComponent<NavMeshAgent> ().remainingDistance < minDist) {
+				if (GameObject.FindObjectOfType<unitWaypoint> ().cover [index].lowCover) {
+					if (crouch == false) {
+						transform.localScale = new Vector3 (0.5f, 0.4f, 0.5f);
+						crouch = true;
 					} else {
-						GetComponent<NavMeshAgent> ().SetDestination (transform.position);
-						prevDest = target.transform.position;
-						delay = totalDelay;
+						if (crouchCoolDown <= 0) {
+							if (transform.localScale == new Vector3 (0.5f, 0.8f, 0.5f)) {
+								transform.localScale = new Vector3 (0.5f, 0.4f, 0.5f);
+							} else {
+								transform.localScale = new Vector3 (0.5f, 0.8f, 0.5f);
+							}
+							crouchCoolDown = 2;
+						} else {
+							crouchCoolDown -= Time.deltaTime;
+						}
 					}
 				}
 			}
 		} else {
-			delay -= Time.deltaTime;
-			if (delay <= 0) {
-				checkPath ();
+			GetComponent<NavMeshAgent> ().speed = startSpeed;
+			transform.localScale = new Vector3 (0.5f, 0.8f, 0.5f);
+			crouch = false;
+		
+			if (follow) {
+				delay -= Time.deltaTime;
+				if (delay <= 0) {
+					if (followingPath) {
+						//deal with following path
+						checkPath ();
+					} else if (target != null) {
+						//deal with following player
+						if (Vector3.Distance (transform.position, target.transform.position) > minDist * 2) {
+							GetComponent<NavMeshAgent> ().SetDestination (target.transform.position);
+							prevDest = target.transform.position;
+						} else {
+							GetComponent<NavMeshAgent> ().SetDestination (transform.position);
+							prevDest = target.transform.position;
+							delay = totalDelay;
+						}
+					}
+				}
+			} else {
+				delay -= Time.deltaTime;
+				if (delay <= 0) {
+					checkPath ();
+				}
 			}
 		}
 	}
@@ -125,7 +147,18 @@ public class unitWay : MonoBehaviour {
 			followingPath = true;
 		}
 		if (follower != null) {
-			follower.GetComponent<unitWay> ().setPath (_path, _delay, totalDelay);
+			foreach (GameObject obj in follower) {
+				obj.GetComponent<unitWay> ().setPath (_path, _delay, totalDelay);
+			}
+		}
+	}
+
+	public void removeFollwer(GameObject _follower) {
+		for (int a = 0; a < follower.Count; a++) {
+			if (follower [a] == _follower) {
+				follower.RemoveAt (a);
+				return;
+			}
 		}
 	}
 
@@ -165,25 +198,53 @@ public class unitWay : MonoBehaviour {
 
 	public void resetFollow() {
 		main = true;
-		target.GetComponent<unitWay> ().resetFollower ();
+		//target.GetComponent<unitWay> ().resetFollower ();
+		target.GetComponent<unitWay> ().removeFollwer(gameObject);
+		follow = false;
 		target = null;
 		followingCount = gatherFollowers ();
 		path.Clear ();
 	}
 
+	/*
 	public void resetFollower() {
 		follower = null;
 		followingCount = gatherFollowers ();
 		followingCount -= 1;
 	}
+	*/
 
 	public int gatherFollowers() {
 		unitWay temp = this;
 		int value = 0;
-		while (temp.follower != null) {
+		while (temp.target != null) {
 			value += 1;
-			temp = temp.follower.GetComponent<unitWay>();
+			temp = temp.target.GetComponent<unitWay>();
 		}
 		return value;
+	}
+
+	public void setupFollower(GameObject other) {
+		main = false;
+		target = other;
+		other.GetComponent<unitWay>().follower.Add(this.gameObject);
+		follow = true;
+		gatherFollowers ();
+	}
+
+	public List<GameObject> returnAllFollowers() {
+		List<GameObject> temp = new List<GameObject> ();
+		foreach (GameObject obj in follower) {
+			temp.Add (obj);
+			if (obj.GetComponent<unitWay> ().follower.Count != 0) {
+				List<GameObject> temp2 = obj.GetComponent<unitWay> ().returnAllFollowers ();
+				foreach (GameObject obj2 in temp2) {
+					if (!temp.Contains (obj2)) {
+						temp.Add (obj2);
+					}
+				}
+			}
+		}
+		return temp;
 	}
 }
