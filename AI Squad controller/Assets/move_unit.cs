@@ -10,8 +10,8 @@ public class move_unit : MonoBehaviour {
 	void Update () {
 		if (Input.GetMouseButton (0)) {
 			RaycastHit hit;
-			Camera[] temp = Camera.allCameras;
-			Ray mousePoint = temp[0].ScreenPointToRay (Input.mousePosition);
+			Camera[] cam = Camera.allCameras;
+			Ray mousePoint = cam[0].ScreenPointToRay (Input.mousePosition);
 			if (Physics.Raycast (mousePoint,out hit)) {
 				GameObject[] objects = GameObject.FindGameObjectsWithTag ("Unit");
 				foreach (GameObject obj in objects) {
@@ -23,6 +23,7 @@ public class move_unit : MonoBehaviour {
 						obj.GetComponent<Unit> ().awaitingClimb = false;
 					}
 					obj.GetComponent<NavMeshAgent> ().SetDestination (hit.point);
+
 				}
 			}
 		}
