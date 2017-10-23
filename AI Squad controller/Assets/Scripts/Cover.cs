@@ -5,6 +5,7 @@ using UnityEngine;
 public class Cover : MonoBehaviour {
 
 	public Vector3 pos = Vector3.zero;
+	public int index = 0;
 	public bool free = true;
 	public bool lowCover = false;
 	public bool rightCover = false;

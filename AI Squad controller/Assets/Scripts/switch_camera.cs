@@ -4,19 +4,40 @@ using UnityEngine;
 
 public class switch_camera : MonoBehaviour {
 
-	public Camera cam1;
-	public Camera cam2;
+	public GameObject cam1;
+	public GameObject cam2;
 
 	// Use this for initialization
 	void Start () {
-		
+		Cursor.lockState = CursorLockMode.Locked;
 	}
 	
 	// Update is called once per frame
 	void Update () {
 		if (Input.GetKeyDown (KeyCode.Space)) {
-			cam1.enabled = !cam1.enabled;
-			cam2.enabled = !cam2.enabled;
+
+			if (cam1.GetComponent<Camera>().enabled) {
+				cam1.GetComponent<Camera> ().enabled = false;
+				cam1.GetComponent<AudioListener> ().enabled = false;
+				cam1.GetComponent<unitWaypoint> ().scriptEnabled = false;
+				cam2.GetComponent<UnityStandardAssets.Characters.FirstPerson.RigidbodyFirstPersonController>().enabled = true;
+				cam2.GetComponentInChildren<Camera> ().enabled = true;
+				cam2.GetComponentInChildren<AudioListener> ().enabled = true;
+				Cursor.lockState = CursorLockMode.Locked;
+				Time.timeScale = 1;
+
+			} else {
+				cam1.GetComponent<Camera> ().enabled = true;
+				cam1.GetComponent<AudioListener> ().enabled = true;
+				cam1.GetComponent<unitWaypoint> ().scriptEnabled = true;
+				cam2.GetComponent<UnityStandardAssets.Characters.FirstPerson.RigidbodyFirstPersonController>().enabled = false;
+				cam2.GetComponentInChildren<Camera> ().enabled = false;
+				cam2.GetComponentInChildren<AudioListener> ().enabled = false;
+				Cursor.lockState = CursorLockMode.None;
+				//Time.timeScale = 0.25f;
+
+			}
+			//cam2.transform.parent.gameObject.SetActive (!cam2.transform.parent.gameObject.activeSelf);
 		}
 	}
 }

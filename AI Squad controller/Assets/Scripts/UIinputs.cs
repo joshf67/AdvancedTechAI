@@ -14,7 +14,7 @@ public class UIinputs : MonoBehaviour {
 	public Sprite waypointUI = null;
 	public Sprite moveUI = null;
 	public Sprite followUI = null;
-	public int time = 0;
+	public int time = 1;
 
 	public Text text = null;
 	public Button but1 = null;
@@ -27,11 +27,13 @@ public class UIinputs : MonoBehaviour {
 	}
 
 	public void increase() {
-		time += 1;
+		if (time <= 2) {
+			time += 1;
+		}
 	}
 
 	public void decrease() {
-		if (time > 0) {
+		if (time > 1) {
 			time -= 1;
 		}
 	}
