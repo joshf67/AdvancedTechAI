@@ -37,9 +37,9 @@ public class unitWaypoint : MonoBehaviour {
 					RaycastHit hit;
 					if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
 						GetComponent<LineRenderer> ().enabled = true;
-						hitPos = hit.point + new Vector3 (0, 0.1f, 0) * Time.unscaledDeltaTime;
+						hitPos = hit.point + new Vector3 (0, 0.1f, 0);
 					}
-					radius += Time.deltaTime;
+					radius += Time.unscaledDeltaTime;
 					displayRadius ();
 				}
 			}

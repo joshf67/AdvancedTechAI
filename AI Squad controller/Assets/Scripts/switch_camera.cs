@@ -34,10 +34,9 @@ public class switch_camera : MonoBehaviour {
 				cam2.GetComponentInChildren<Camera> ().enabled = false;
 				cam2.GetComponentInChildren<AudioListener> ().enabled = false;
 				Cursor.lockState = CursorLockMode.None;
-				//Time.timeScale = 0.25f;
+				Time.timeScale = 0.25f;
 
 			}
-			//cam2.transform.parent.gameObject.SetActive (!cam2.transform.parent.gameObject.activeSelf);
 		}
 	}
 }
