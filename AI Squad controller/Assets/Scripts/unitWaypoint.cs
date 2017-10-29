@@ -13,7 +13,7 @@ public class unitWaypoint : MonoBehaviour {
 	public Material line;
 	public List<GameObject> pathObj = new List<GameObject>();
 	public Cover[] cover;
-	public List<GameObject> selected = new List<GameObject>();
+	public List<unitWay> selected = new List<unitWay>();
 	public Vector3 hitPos;
 	public float radius = 0.1f;
 	public bool scriptEnabled = false;
@@ -46,15 +46,15 @@ public class unitWaypoint : MonoBehaviour {
 
 			if (Input.GetMouseButtonUp (0) && !EventSystem.current.IsPointerOverGameObject ()) {
 				if (main.selection) {
-					foreach (GameObject obj in selected) {
-						obj.GetComponent<unitWay> ().selected = false;
+					foreach (unitWay obj in selected) {
+						obj.selected = false;
 					}
 					selected.Clear ();
 					if (hitPos != -Vector3.one) {
 						Collider[] temp = Physics.OverlapSphere (hitPos, radius);
 						foreach (Collider obj in temp) {
 							if (obj.GetComponent<unitWay> ()) {
-								selected.Add (obj.gameObject);
+								selected.Add (obj.GetComponent<unitWay> ());
 								obj.GetComponent<unitWay> ().selected = true;
 							}
 						}
@@ -72,11 +72,12 @@ public class unitWaypoint : MonoBehaviour {
 							if (selected [a].GetComponent<unitWay> ().follow) {
 								selected [a].GetComponent<unitWay> ().resetFollow ();
 							}
+							selected [a].GetComponent<unitWay> ().follow = true;
 							if (selected [a].GetComponent<unitWay> ().main) {
 								hasUnit = true;
-								selected [a].GetComponent<unitWay> ().setPath (path, 0/*path[0].timeDelay*/, 0);
+								selected [a].GetComponent<unitWay> ().setPath (path, 0, 0);
 							}
-							selected [a].GetComponent<unitWay> ().pos = Vector3.zero;
+							selected [a].GetComponent<unitWay> ().coverPos = Vector3.zero;
 						}
 						if (hasUnit) {
 							path.Clear ();
@@ -96,10 +97,7 @@ public class unitWaypoint : MonoBehaviour {
 					RaycastHit hit;
 					if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
 						//add current pos + delay to path
-						pathData tempPath = new pathData ();
-						tempPath.path = hit.point;
-						//tempPath.timeDelay = delay;
-						tempPath.speed = delay;
+						pathData tempPath = new pathData (hit.point, delay);
 						path.Add (tempPath);
 
 						//setup drawing of path
@@ -124,22 +122,17 @@ public class unitWaypoint : MonoBehaviour {
 					RaycastHit hit;
 					if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
 						if (hit.collider.tag == "Cover") {
-							findCoverForSelected (hit.point, hit.collider, selected);
+							findCoverForSelected (hit.point, hit.collider, selected, true, true, true);
 						} else {
-							resetCoverForSelected (hit.point, selected);
+							resetCoverForSelected (hit.point, selected, true, true, true);
 						}
 					}
 				} else if (main.follow) {
 					RaycastHit hit;
 					if (Physics.Raycast (Camera.main.ScreenPointToRay (Input.mousePosition), out hit)) {
 						if (hit.collider.tag == "Unit") {
-							foreach (GameObject obj in selected) {
-								obj.GetComponent<unitWay> ().setupFollower (hit.collider.gameObject);
-							}
-							foreach (GameObject obj in selected) {
-								if (obj.GetComponent<unitWay> ().requestCover) {
-									obj.GetComponent<unitWay> ().pos = findClosest (hit.collider.gameObject.transform.position, hit.collider, obj.transform.position, out obj.GetComponent<unitWay> ().index);
-								}
+							foreach (unitWay obj in selected) {
+								obj.setupFollower (hit.collider.gameObject);
 							}
 						}
 					}
@@ -164,14 +157,11 @@ public class unitWaypoint : MonoBehaviour {
 		if (scriptEnabled) transform.Translate (Vector3.down);
 	}
 
-	public void requestCover(GameObject requester) {
-		List<GameObject> temp = new List<GameObject> ();
-		temp = requester.GetComponent<unitWay> ().returnAllFollowers ();
-		temp.Add (requester);
-		findCoverForSelected (requester.transform.position, requester.GetComponent<Collider>(), temp);
+	public void requestCover(unitWay requester, bool requiresPath = true, bool includeChildren = false, bool resetFollow = false, List<int> ignoreIndex = null) {
+		findCoverForSelected (requester.transform.position, requester.GetComponent<Collider>(), requester, requiresPath, includeChildren, resetFollow, ignoreIndex);
 	}
 
-	Vector3 findClosest (Vector3 temp, Collider other, Vector3 pos, out int _index) {
+	Vector3 findClosest (Vector3 temp, Collider other, Vector3 pos, out int _index, List<int> ignoreIndex = null) {
 		//setup default values
 		Vector3 ret = Vector3.zero;
 		float curDist = float.PositiveInfinity;
@@ -183,36 +173,50 @@ public class unitWaypoint : MonoBehaviour {
 
 		//setup offset for object height to floor
 		Vector3 offset = (temp - other.transform.position) + new Vector3(0, other.bounds.size.y/2,0);
-		Debug.DrawLine (temp, temp - offset, Color.red, 10);
+		//Debug.DrawLine (temp, temp - offset, Color.red, 10);
 
 		//find nearest position on navmesh
-		if (NavMesh.SamplePosition (temp - new Vector3(0, offset.y, 0), out navMeshEdge, 2, NavMesh.AllAreas)) {
+		if (NavMesh.SamplePosition (temp - new Vector3 (0, offset.y, 0), out navMeshEdge, 2, NavMesh.AllAreas)) {
 
 			//find all objects within distance to navmesh
 			cols = Physics.OverlapSphere (navMeshEdge.position, 5);
-			Debug.DrawLine (temp, navMeshEdge.position, Color.green, 10);
+			//Debug.DrawLine (temp, navMeshEdge.position, Color.green, 10);
 			for (int a = 0; a < cols.Length; a++) {
-				//check if the object is cover
 				if (cols [a].tag == "CoverSpot") {
-					Cover cov = cols [a].GetComponent<Cover> ();
-
-					if (cov.free == true) {
-						//check if the cover can be seen by enemies
-						danger = pollDanger (cov);
-
-						//create new navmesh path
-						NavMeshPath path = new NavMeshPath ();
-						if (NavMesh.CalculatePath (navMeshEdge.position, cov.pos, NavMesh.AllAreas, path)) {
-							//check the navigation cost of the path
-							navDist = 0;
-							for (int b = 0; b < path.corners.Length - 1; b++) {
-								navDist += Vector3.Distance (path.corners [b], path.corners [b + 1]);
+					bool ignore = false;
+					if (ignoreIndex != null) {
+						foreach (int i in ignoreIndex) {
+							if (i == cols [a].GetComponent<Cover> ().index) {
+								ignore = true;
 							}
-							//check if distance is less than current distance
-							if (Vector3.Distance (cov.transform.position, temp) + navDist + danger < curDist) {
-								ret = cov.transform.position;
-								curDist = Vector3.Distance (cov.transform.position, temp) + danger + navDist;
-								index = cov.index;
+						}
+					}
+
+					//check if the object is cover
+					if (!ignore) {
+						Cover cov = cols [a].GetComponent<Cover> ();
+						if (!Physics.Raycast (pos, cov.transform.position - pos, (cov.transform.position - pos).magnitude, 1 << 8)) {
+
+							if (cov.free == true) {
+								//check if the cover can be seen by enemies
+								danger = pollDanger (cov);
+
+								//create new navmesh path
+								NavMeshPath path = new NavMeshPath ();
+								if (NavMesh.CalculatePath (navMeshEdge.position, cov.pos, NavMesh.AllAreas, path)) {
+									//check the navigation cost of the path
+									navDist = 0;
+									for (int b = 0; b < path.corners.Length - 1; b++) {
+										navDist += Vector3.Distance (path.corners [b], path.corners [b + 1]);
+									}
+
+									//check if distance is less than current distance
+									if (Vector3.Distance (cov.transform.position, temp) + navDist + danger < curDist) {
+										ret = cov.transform.position;
+										curDist = Vector3.Distance (cov.transform.position, temp) + danger + navDist;
+										index = cov.index;
+									}
+								}
 							}
 						}
 					}
@@ -221,7 +225,6 @@ public class unitWaypoint : MonoBehaviour {
 		}
 		//set cover to be full
 		cover [index].free = false;
-		Debug.Log(cover [index].free);
 		_index = index;
         if (ret == Vector3.zero)
         {
@@ -234,6 +237,7 @@ public class unitWaypoint : MonoBehaviour {
 		//loop through all enemies and check if they can see the object
 		GameObject[] enemies = GameObject.FindGameObjectsWithTag ("Enemy");
 		float _val = 0;
+		Vector3 startScale = cover.gameObject.transform.lossyScale;
 		foreach (GameObject enemy in enemies) {
 			//test if the enemy can see the coverSpot
 			if (Physics.Raycast (enemy.transform.position, cover.pos - enemy.transform.position, Vector3.Distance (enemy.transform.position, cover.transform.position), 1 << 8)) {
@@ -298,60 +302,80 @@ public class unitWaypoint : MonoBehaviour {
 		}
 	}
 
-	void findCoverForSelected(Vector3 hit, Collider other, List<GameObject> _selected) {
-		//reset cover for the selected object
-		resetCoverForSelected (hit, _selected);
+	public void findCoverForSelected(Vector3 hit, Collider otherCol, unitWay other, bool requiresPath = true, bool includeChildren = false, bool resetFollow = false, List<int> ignoreIndex = null) {
+		List<unitWay> temp = new List<unitWay>();
+		temp.Add (other);
+		findCoverForSelected (hit, otherCol, temp, requiresPath, includeChildren, resetFollow, ignoreIndex);
+	}
+
+	public void findCoverForSelected(Vector3 hit, Collider otherCol, List<unitWay> others, bool requiresPath = true, bool includeChildren = false, bool resetFollow = false, List<int> ignoreIndex = null) {
+
+		//resetCoverForSelected
+		resetCoverForSelected (hit, others, requiresPath, includeChildren, resetFollow);
 
 		//setup new list to check if object has been removed or not
-		List<GameObject> temp = new List<GameObject>();
-		for (int a = 0; a < _selected.Count; a++) {
+		List<unitWay> temp = new List<unitWay>();
+
+		//setup cover index
+		int index = -1;
+
+		//loop through all others and find cover
+		for (int a = 0; a < others.Count; a++) {
 
 			//loop through all selected object and find a cover
-			int index = 0;
-			Vector3 closest = findClosest (hit, other, _selected [a].transform.position, out index);
-			temp.Add (_selected [a]);
-			_selected [a].GetComponent<unitWay> ().forceMove = false;
+			Vector3 closest = findClosest (hit, otherCol, others [a].transform.position, out index, ignoreIndex);
+			temp.Add (others [a]);
 
 			//setup all cover data for unit
-			_selected [a].GetComponent<unitWay> ().pos = closest;
-			_selected [a].GetComponent<unitWay> ().index = index;
-			if (_selected [a].GetComponent<unitWay> ().follow) {
-				_selected [a].GetComponent<unitWay> ().resetFollow ();
-			}
+			others [a].coverPos = closest;
+			others [a].index = index;
 
-			//loop through all selected children and setup cover data for them
-			foreach (GameObject obj in _selected [a].GetComponent<unitWay>().returnAllFollowers()) {
-				if (obj.GetComponent<unitWay> ().pos == Vector3.zero && !temp.Contains (obj)) {
-					temp.Add (obj);
-					Vector3 closest2 = findClosest (hit, other, obj.transform.position, out index);
-					obj.GetComponent<unitWay> ().pos = closest2;
-					obj.GetComponent<unitWay> ().index = index;
+			if (includeChildren) {
+				//loop through all selected children and setup cover data for them
+				foreach (unitWay obj in others [a].returnAllFollowers()) {
+					if (obj.GetComponent<unitWay> ().coverPos == Vector3.zero && !temp.Contains (obj)) {
+						temp.Add (obj);
+						Vector3 closest2 = findClosest (hit, otherCol, obj.transform.position, out index);
+						obj.GetComponent<unitWay> ().coverPos = closest2;
+						obj.GetComponent<unitWay> ().index = index;
+					}
 				}
 			}
 		}
 	}
 
-	public void resetCoverForSelected(Vector3 hit, List<GameObject> _selected) {
-		//loop through all selected objects and reset cover data
-		for (int a = 0; a < _selected.Count; a++) {
-			_selected [a].GetComponent<unitWay> ().crouch = false;
-			//reset follow data
-			if (_selected [a].GetComponent<unitWay> ().follow) {
-				_selected [a].GetComponent<unitWay> ().resetFollow ();
-			}
-			//set cover data to blank and set destination to click
-			cover [_selected [a].GetComponent<unitWay> ().index].free = true;
-			_selected [a].GetComponent<unitWay> ().pos = Vector3.zero;
-			_selected [a].GetComponent<unitWay> ().forceMove = true;
-			_selected [a].GetComponent<unitWay> ().inCover = false;
-			_selected [a].GetComponent<unitWay> ().foundEnemyLastSeen = Vector3.zero;
-			_selected [a].GetComponent<NavMeshAgent> ().SetDestination (hit);
+	public void resetCoverforselected(Vector3 hit, unitWay other, bool requiresPath = true, bool includeChildren = false, bool resetFollow = false) {
 
-			//repeat for all children of selected
-			foreach (GameObject obj in _selected [a].GetComponent<unitWay>().returnAllFollowers()) {
-				obj.GetComponent<unitWay> ().pos = Vector3.zero;
-				cover [obj.GetComponent<unitWay> ().index].free = true;
+		//reset data for selected
+		if (resetFollow) {
+			other.resetFollow ();
+			other.foundEnemyLastSeen.Clear ();
+		}
+
+		if (requiresPath) {
+			pathData tempPath = new pathData (hit, 2);
+			other.setPath(tempPath,0,0);
+		}
+
+		cover [other.index].free = true;
+		other.coverPos = Vector3.zero;
+
+		other.follow = true;
+
+		//repeat for all children of selected
+		if (includeChildren) {
+			foreach (unitWay obj in other.returnAllFollowers()) {
+				obj.coverPos = Vector3.zero;
+				cover [obj.index].free = true;
 			}
+		}
+
+	}
+
+	public void resetCoverForSelected(Vector3 hit, List<unitWay> other, bool requiresPath = true, bool includeChildren = false, bool resetFollow = false)
+	{
+		foreach (unitWay obj in other) {
+			resetCoverforselected (hit, obj, requiresPath, includeChildren, resetFollow);
 		}
 	}
 }
@@ -360,4 +384,139 @@ public class unitWaypoint : MonoBehaviour {
 public class pathData{
 	public Vector3 path;
 	public float speed;
+
+	public pathData(Vector3 _path, float _speed) {
+		path = _path;
+		speed = _speed;
+	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+	public void requestCover(GameObject requester) {
+		List<GameObject> temp = new List<GameObject> ();
+		temp = requester.GetComponent<unitWay> ().returnAllFollowers ();
+		temp.Add (requester);
+		findCoverForSelected (requester.transform.position, requester.GetComponent<Collider>(), temp);
+	} 
+
+	public void resetCover(unitWay requester) {
+		List<unitWay> temp = new List<unitWay> ();
+		temp = requester.GetComponent<unitWay> ().returnAllFollowers ();
+		temp.Add (requester);
+		findCoverForSelected (requester.transform.position, requester.GetComponent<Collider>(), temp);
+	} */
+
+
+/*public void resetCoverForSelected(Vector3 hit, unitWay other, bool includeChildren, bool hasEnemy) {
+
+		//reset game object path
+		other.crouch = false;
+		if (other.follow) {
+			other.resetFollow ();
+		}
+
+		//set cover data to blank and set destination to click
+		cover [other.index].free = true;
+		other.coverPos = Vector3.zero;
+		other.forceMove = true;
+		other.inCover = false;
+		other.followingPath = true;
+		other.follow = true;
+
+		if (hasEnemy) {
+			//setup new position for unit
+			List<pathData> tempPath = new List<pathData> ();
+			pathData tempPathData = new pathData ();
+			tempPathData.speed = 2;
+			tempPathData.path = hit;
+			tempPath.Add(tempPathData);
+			other.setPath (tempPath, 0, 0);
+			other.foundEnemyLastSeen = Vector3.zero;
+		}
+
+
+		//reset cover data for children
+		if (includeChildren) {
+			foreach (unitWay obj in other.returnAllFollowers()) {
+				obj.GetComponent<unitWay> ().pos = Vector3.zero;
+				cover [obj.GetComponent<unitWay> ().index].free = true;
+			}
+		}
+
+	}*/
+
+
+
+
+/*void findCoverForSelected(Vector3 hit, Collider other, List<unitWay> _selected) {
+//reset cover for the selected object
+resetCoverForSelected (hit, _selected);
+
+//setup new list to check if object has been removed or not
+List<unitWay> temp = new List<unitWay>();
+for (int a = 0; a < _selected.Count; a++) {
+
+	//loop through all selected object and find a cover
+	int index = 0;
+	Vector3 closest = findClosest (hit, other, _selected [a].transform.position, out index);
+	temp.Add (_selected [a]);
+	_selected [a].forceMove = false;
+
+	//setup all cover data for unit
+	_selected [a].coverPos = closest;
+	_selected [a].index = index;
+	if (_selected [a].follow) {
+		_selected [a].resetFollow ();
+	}
+
+	//loop through all selected children and setup cover data for them
+	foreach (unitWay obj in _selected [a].GetComponent<unitWay>().returnAllFollowers()) {
+		if (obj.GetComponent<unitWay> ().coverPos == Vector3.zero && !temp.Contains (obj)) {
+			temp.Add (obj);
+			Vector3 closest2 = findClosest (hit, other, obj.transform.position, out index);
+			obj.GetComponent<unitWay> ().coverPos = closest2;
+			obj.GetComponent<unitWay> ().index = index;
+		}
+	}
+}
+} */
+
+
+
+/*public void resetCoverForSelected(List<GameObject> _selected) {
+for (int a = 0; a < _selected.Count; a++) {
+	cover [_selected [a].GetComponent<unitWay> ().index].free = true;
+	_selected [a].GetComponent<unitWay> ().index = -1;
+	_selected [a].GetComponent<unitWay> ().coverPos = Vector3.zero;
+}
+}*/
